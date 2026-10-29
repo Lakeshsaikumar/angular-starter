@@ -4,19 +4,44 @@
 # https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
 
 trigger:
-- master
+  - main
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'ubuntu-latest'
 
 steps:
-- task: NodeTool@0
-  inputs:
-    versionSpec: '20.x'
-  displayName: 'Install Node.js'
+  # 1. Set up Node.js
+  - task: NodeTool@0
+    displayName: 'Use Node.js 22'
+    inputs:
+      versionSpec: '22.x'
 
-- script: |
-    npm install -g @angular/cli
-    npm install
-    ng build --prod
-  displayName: 'npm install and build'
+  # 2. Verify Node.js and npm
+  - script: |
+      node --version
+      npm --version
+    displayName: 'Check Node.js and npm'
+
+  # 3. Install dependencies
+  - script: npm ci
+    displayName: 'Install npm dependencies'
+
+  # 4. Build Angular application
+  - script: npm run build
+    displayName: 'Build Angular application'
+
+  # 5. Publish the Angular build output
+  - task: CopyFiles@2
+    displayName: 'Copy Angular build files'
+    inputs:
+      SourceFolder: '$(Build.SourcesDirectory)/dist'
+      Contents: '**'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)/dist'
+
+  # 6. Publish artifact
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish build artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)/dist'
+      ArtifactName: 'angular-app'
+      publishLocation: 'Container'
