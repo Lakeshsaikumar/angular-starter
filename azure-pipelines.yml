@@ -3,18 +3,21 @@
 # Add steps that analyze code, save build artifacts, deploy, and more:
 # https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
 
+
+# Angular 22 Build and ZIP Artifact
+
 trigger:
-  - main
+  - master
 
 pool:
   vmImage: 'ubuntu-latest'
 
 steps:
-  # 1. Set up Node.js
-  - task: NodeTool@0
+  # 1. Install Node.js
+  - task: UseNode@1
     displayName: 'Use Node.js 22'
     inputs:
-      versionSpec: '22.x'
+      version: '22.x'
 
   # 2. Verify Node.js and npm
   - script: |
@@ -30,18 +33,36 @@ steps:
   - script: npm run build
     displayName: 'Build Angular application'
 
-  # 5. Publish the Angular build output
-  - task: CopyFiles@2
-    displayName: 'Copy Angular build files'
-    inputs:
-      SourceFolder: '$(Build.SourcesDirectory)/dist'
-      Contents: '**'
-      TargetFolder: '$(Build.ArtifactStagingDirectory)/dist'
+  # 5. Find Angular browser output and create ZIP
+  - script: |
+      set -e
 
-  # 6. Publish artifact
+      echo "Searching for Angular index.html..."
+
+      INDEX_FILE=$(find "$(Build.SourcesDirectory)/dist" -name index.html -type f -print -quit)
+
+      if [ -z "$INDEX_FILE" ]; then
+        echo "ERROR: Angular index.html not found!"
+        exit 1
+      fi
+
+      BUILD_FOLDER=$(dirname "$INDEX_FILE")
+
+      echo "Angular build folder: $BUILD_FOLDER"
+
+      mkdir -p "$(Build.ArtifactStagingDirectory)/angular-app"
+
+      cd "$BUILD_FOLDER"
+
+      zip -r "$(Build.ArtifactStagingDirectory)/angular-app/angular-app.zip" .
+
+      echo "Angular ZIP created successfully."
+    displayName: 'Create Angular deployment ZIP'
+
+  # 6. Publish ZIP artifact
   - task: PublishBuildArtifacts@1
-    displayName: 'Publish build artifact'
+    displayName: 'Publish Angular ZIP artifact'
     inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)/dist'
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)/angular-app'
       ArtifactName: 'angular-app'
       publishLocation: 'Container'
